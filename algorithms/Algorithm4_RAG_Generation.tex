@@ -1,0 +1,92 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{geometry}
+\geometry{top=0.55in, bottom=0.55in, left=0.75in, right=0.75in}
+
+\begin{document}
+
+\setcounter{algorithm}{3}
+
+\begin{algorithm}[H]
+\small
+\caption{Multimodal Retrieval-Augmented Generation for CXR Report (Image-guided retrieval + LLM)}
+\begin{algorithmic}[1]
+
+\Require Query set $\mathcal{Q} = \{(\mathbf{X}_i,\, \text{id}_i)\}_{i=1}^{N}$, where $\mathbf{X}_i$ is a chest radiograph
+\Require Frozen BioMedCLIP image encoder $f_{\text{clip}}$ for visual embedding
+\Require Pre-built FAISS gallery index $\mathcal{F}$ with metadata $\mathcal{M}$
+         \Comment{Each entry $m \in \mathcal{M}$: normal flag, label list, caption, FINDINGS, IMPRESSION}
+\Require Text-only LLM $\mathcal{G}$ with tokenizer $\mathcal{T}$; LoRA adapter \textit{disabled} during generation
+\Require System prompt $P_{\text{sys}}$; retrieval size $k{=}10$; max input length $L_{\max}$; max new tokens $T_{\max}$
+
+\Ensure Generated radiology report $r_i$ for each query $\mathbf{X}_i$
+
+\For{each query $(\mathbf{X}_i, \text{id}_i) \in \mathcal{Q}$}
+
+    % ── Step 1: Visual embedding for retrieval ────────────────────────────
+    \State Load $\mathbf{X}_i$ as RGB; encode with frozen $f_{\text{clip}}$:
+    \[
+        \mathbf{q}_i \;=\; \frac{f_{\text{clip}}(\mathbf{X}_i)}{\|f_{\text{clip}}(\mathbf{X}_i)\|_2}
+        \;\in\;\mathbb{R}^{d}
+        \quad \text{\Comment{L2-normalised BioMedCLIP image embedding}}
+    \]
+
+    % ── Step 2: FAISS top-k retrieval ────────────────────────────────────
+    \State Search gallery: $\{(\text{idx}_j,\, s_j)\}_{j=1}^{k} \gets \mathcal{F}.\texttt{search}(\mathbf{q}_i,\, k)$
+           \Comment{Inner-product search; $s_j$ = cosine similarity score}
+    \State Retrieve neighbour records: $\mathcal{N}_i \gets \{\mathcal{M}[\text{idx}_j]\}_{j=1}^{k}$
+           \Comment{Image is used \textit{only} for retrieval; it is \textbf{not} passed to the LLM}
+
+    % ── Step 3: Reference block construction ─────────────────────────────
+    \State For each $m_j \in \mathcal{N}_i$, format as structured text:
+    \begin{align*}
+        b_j \;\gets\; &
+        \underbrace{\texttt{``Reference }j\texttt{:}}_{\text{rank header}}
+        \;\|\;
+        \underbrace{\texttt{normal:}\;m_j.\text{normal}}_{\text{normality}}
+        \;\|\;
+        \underbrace{\texttt{labels:}\;m_j.\text{labels}}_{\text{CheXpert labels}} \\
+        &\;\|\;
+        \underbrace{m_j.\text{caption}}_{\text{caption}}
+        \;\|\;
+        \underbrace{m_j.\text{FINDINGS}}_{\text{findings}}
+        \;\|\;
+        \underbrace{m_j.\text{IMPRESSION}}_{\text{impression}}
+    \end{align*}
+    \State Concatenate: $\mathcal{E}_i \gets b_1 \;\|\; b_2 \;\|\; \cdots \;\|\; b_k$
+
+    % ── Step 4: Prompt construction ───────────────────────────────────────
+    \State Build text-only chat prompt $\mathcal{C}_i$:
+    \[
+        \mathcal{C}_i \;\gets\;
+        \bigl[\{\texttt{system}: P_{\text{sys}}\},\;
+              \{\texttt{user}: \underbrace{\text{``Use retrieved references to write FINDINGS and IMPRESSION.''}}_{\text{task instruction}} \;\|\; \mathcal{E}_i\}\bigr]
+    \]
+    \State Format: $c_i \gets \mathcal{T}.\texttt{apply\_chat\_template}(\mathcal{C}_i,\;
+           \texttt{add\_generation\_prompt=True})$
+    \State Tokenise: $(I_i, A_i) \gets \mathcal{T}(c_i,\;\texttt{truncate}=L_{\max})$
+
+    % ── Step 5: Report generation (LoRA OFF) ─────────────────────────────
+    \State \textbf{Disable} LoRA adapter on $\mathcal{G}$ \Comment{Generator uses base weights only}
+    \State Generate (greedy decoding):
+    \[
+        \hat{I}_i \;\gets\; \mathcal{G}.\texttt{generate}(I_i,\,A_i,\;
+        \texttt{max\_new\_tokens}{=}T_{\max},\;
+        \texttt{do\_sample}{=}\textsc{False})
+    \]
+    \State Decode new tokens: $r_i \gets \mathcal{T}.\texttt{decode}(\hat{I}_i[|I_i|{:}],\;
+           \texttt{skip\_special\_tokens}{=}\textsc{True})$
+    \State Normalise $r_i$: strip artefacts; collapse whitespace
+    \State \textbf{Re-enable} LoRA adapter on $\mathcal{G}$ \Comment{Restores adapter for subsequent verifier calls}
+
+\EndFor
+
+\State \Return $\{r_i\}_{i=1}^{N}$
+
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}

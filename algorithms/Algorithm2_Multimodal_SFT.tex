@@ -1,0 +1,80 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{geometry}
+\geometry{top=0.55in, bottom=0.55in, left=0.75in, right=0.75in}
+
+\begin{document}
+
+\setcounter{algorithm}{1}
+
+\begin{algorithm}[H]
+\small
+\caption{Supervised Fine-tuning of a Multimodal LoRA Verifier}
+\begin{algorithmic}[1]
+
+\Require Verification dataset $\mathcal{D} = \{(e_i,\, s_i,\, \mathbf{X}_i,\, y_i)\}_{i=1}^{N}$, where $e_i$ is structured evidence, $s_i$ a candidate statement, $\mathbf{X}_i$ the chest radiograph, $y_i \in \{\textsc{True},\textsc{False}\}$
+\Require Pre-trained vision-language model $\mathcal{M}$ (AutoModelForImageTextToText) with multimodal processor $\mathcal{P}$ (AutoProcessor)
+\Require System prompt $P_{\text{sys}}$; BOI marker $\tau_{\text{BOI}}=\texttt{<start\_of\_image>}$
+\Require LoRA rank $r$, scaling factor $\alpha$, dropout $p_{\text{drop}}$, target projection modules $\mathcal{S}$
+\Require Epochs $E$, batch size $B$, gradient accumulation steps $G$, learning rate $\eta$, warmup ratio $w$, max sequence length $L_{\max}$
+
+\Ensure Trained LoRA adapter parameters $\Theta_{\text{LoRA}}$ and processor $\mathcal{P}$
+
+\State Load $\mathcal{M}$ from pre-quantised 4-bit checkpoint; freeze base weights; enable gradient checkpointing
+\State Attach LoRA adapters to modules $\mathcal{S}$ with rank $r$, scaling $\alpha$, dropout $p_{\text{drop}}$ $\;\Rightarrow\;\mathcal{M}_{\text{LoRA}}$
+
+\For{each $(e_i, s_i, \mathbf{X}_i, y_i) \in \mathcal{D}$}
+    \State Load $\mathbf{X}_i$ as RGB; resize to $896{\times}896$ pixels via $\mathcal{P}$
+    \State Build prompt and full chat turns:
+    \begin{align*}
+        m_i^{\text{prompt}} &\gets [\{\texttt{sys}: P_{\text{sys}}\},\;\{\texttt{user}: e_i \oplus s_i\}] \\
+        m_i^{\text{full}}   &\gets [\{\texttt{sys}: P_{\text{sys}}\},\;\{\texttt{user}: e_i \oplus s_i\},\;\{\texttt{asst}: y_i\}]
+    \end{align*}
+    \State Format both via chat template; prepend $\tau_{\text{BOI}}$ if absent \Comment{Required for image-token alignment}
+    \State Process with $\mathcal{P}$, passing the same image $\mathbf{X}_i$ to both calls:
+    \[
+        (I_i^{\text{prompt}},\,\mathbf{V}_i) \gets \mathcal{P}(m_i^{\text{prompt}},\,\mathbf{X}_i),
+        \qquad
+        (I_i,\,A_i,\,\mathbf{V}_i) \gets \mathcal{P}(m_i^{\text{full}},\,\mathbf{X}_i)
+    \]
+    \State Apply label masking at prompt boundary $\ell_i^{\text{prompt}} = |I_i^{\text{prompt}}|$:
+    \[
+        \Lambda_{i,t} =
+        \begin{cases}
+            -100    & t \leq \ell_i^{\text{prompt}} \\
+            I_{i,t} & \text{otherwise}
+        \end{cases}
+    \]
+    \State Store aligned triplet $\{I_i,\,A_i,\,\mathbf{V}_i,\,\Lambda_i\}$; discard if $|I_i| > L_{\max}$
+\EndFor
+\State Split into $\mathcal{D}_{\text{train}}$ ($98\%$, $n=7{,}743$) and $\mathcal{D}_{\text{val}}$ ($2\%$, $n=159$) with fixed random seed
+
+\State Initialise paged AdamW-8bit optimiser with cosine LR schedule, rate $\eta$, warmup ratio $w$
+\For{$\text{epoch} = 1$ \textbf{to} $E$}
+    \For{each minibatch $\mathcal{B} = \{(I_i, A_i, \mathbf{V}_i, \Lambda_i)\}_{i=1}^{B} \subset \mathcal{D}_{\text{train}}$}
+        \State Pad $\{I_i\}$, $\{A_i\}$, $\{\Lambda_i\}$ to $\max_i|I_i|$; stack $\{\mathbf{V}_i\}$ along batch dim
+        \State Forward pass: $\hat{L} \gets \mathcal{M}_{\text{LoRA}}(I, A, \mathbf{V};\,\Theta_{\text{LoRA}})$
+        \State Compute cross-entropy loss on unmasked (assistant) tokens only:
+        \[
+            \mathcal{L} = -\frac{1}{|\mathcal{B}|}
+            \sum_{i=1}^{|\mathcal{B}|}
+            \sum_{t:\,\Lambda_{i,t} \neq -100}
+            \log \frac{\exp\!\left(\hat{L}_{i,t,\Lambda_{i,t}}\right)}
+                      {\sum_{v} \exp\!\left(\hat{L}_{i,t,v}\right)}
+        \]
+        \State Accumulate gradients; update $\Theta_{\text{LoRA}}$ every $G$ steps
+        \State \texttt{LogMetrics}$(\mathcal{L},\;\text{epoch},\;\text{step})$
+    \EndFor
+    \State Evaluate $\mathcal{L}_{\text{val}}$ on $\mathcal{D}_{\text{val}}$ at every $K$-th step; retain latest 2 checkpoints
+\EndFor
+
+\State Save $\Theta_{\text{LoRA}}$ and $\mathcal{P}$ to adapter directory \Comment{Base model weights remain frozen}
+\State \Return $\Theta_{\text{LoRA}},\;\mathcal{P}$
+
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}

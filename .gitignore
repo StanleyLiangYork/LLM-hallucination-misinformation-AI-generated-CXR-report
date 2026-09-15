@@ -1,0 +1,32 @@
+# Generated experiment data and outputs
+results/
+data/
+outputs/
+*.csv
+*.tsv
+*.jsonl
+*.parquet
+*.npy
+*.npz
+*.index
+
+# Model artifacts and credentials
+models/
+adapters/
+checkpoints/
+*.safetensors
+*.bin
+*.pth
+*.pt
+.env
+.huggingface/
+
+# Jupyter and Python artifacts
+.ipynb_checkpoints/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Operating system files
+.DS_Store
