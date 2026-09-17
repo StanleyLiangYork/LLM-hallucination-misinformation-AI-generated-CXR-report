@@ -1,5 +1,22 @@
 # Retrieval grounding over model scale for hallucination-controlled radiology report generation: a leakage-audited, architecture-dependent evaluation
 
+**Zhaohui Liang, Niccolo Marini, Sivaramakrishnan Rajaraman, Zhiyun Xue, Sameer Antani**
+
+National Library of Medicine, NIH, Bethesda, MD, USA
+
+## Abstract
+
+**Objectives:** Generative models can draft radiology reports but may hallucinate unsupported findings (fabrication) or omit clinically relevant ones (omission). We tested whether retrieval-augmented generation (RAG), verifier gating, and iterative self-correction reduce these failures; whether grounding matters more than scale; and whether apparent gains survive train–test leakage control.
+
+**Materials and Methods:** Seven models generated reports for 1,034 chest radiograph studies. Strategies were single-pass RAG, unconditional revision, pretrained-verifier gating, and corrected low-rank adaptation (LoRA) verifier gating. Retrieval galleries excluded evaluation patients and duplicate images or reports. An independent annotation verified CheXbert-derived report labels, and adjudication resolved disagreements. We evaluated outcomes with cluster resampling, paired tests, and study-level rescue–harm counts.
+
+**Results:** The analysis comprised 57,904 generated reports. No residual train–test overlap remained after gallery cleaning. Label validation reached macro F1 0.860. Fabrication and omission estimates increased after cleaning, which suggests that leakage can exaggerate grounding benefits. Performance depended more on architecture than on model size: larger models were not consistently better, and the configurations that best limited fabrication and omission differed. Unconditional revision produced more study-level harms than rescues. Corrected-verifier gating preserved single-pass performance but changed only 0.28% of study comparisons.
+
+**Discussion:** Retrieval grounding, revision, and entailment verification offered complementary, architecture-dependent tools for controlling fabrication and omission. Benefit–harm analysis showed where each strategy helped or harmed.
+
+**Conclusion:** Retrieval grounding with entailment verification supports privacy-preserving radiology natural language processing on local hardware. However, its benefit is architecture-dependent, so grounding and verification must be validated per architecture rather than assumed to transfer.
+
+## Repository overview
 
 This repository contains the code used for a leakage-controlled rerun of retrieval-augmented chest radiograph report generation. The workflow evaluates seven locally deployable language-only and multimodal models under four strategies:
 
