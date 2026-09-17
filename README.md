@@ -1,4 +1,5 @@
-# Leakage controlled retrieval grounded CXR report generation
+# Retrieval grounding over model scale for hallucination-controlled radiology report generation: a leakage-audited, architecture-dependent evaluation
+
 
 This repository contains the code used for a leakage-controlled rerun of retrieval-augmented chest radiograph report generation. The workflow evaluates seven locally deployable language-only and multimodal models under four strategies:
 
