@@ -73,7 +73,7 @@ def test_preencoded_alignment_requires_unique_identifier():
 
 def test_packaged_leakage_helpers_do_not_expose_statistics_shadow_path():
     rerun_root = Path(__file__).parents[1].resolve()
-    implementation = (rerun_root / "rerun_code").resolve()
+    implementation = (rerun_root / "src" / "rerun_code").resolve()
     previous = list(sys.path)
     try:
         located = add_leakage_code_to_path(rerun_root)
@@ -85,7 +85,7 @@ def test_packaged_leakage_helpers_do_not_expose_statistics_shadow_path():
 
 def test_notebook_05_uses_package_qualified_retrieval_import():
     notebook = json.loads(
-        (Path(__file__).parents[1] / "05_run_multimodel_generation.ipynb").read_text(encoding="utf-8")
+        (Path(__file__).parents[1] / "notebooks" / "05_run_multimodel_generation.ipynb").read_text(encoding="utf-8")
     )
     source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
     assert "from rerun_code.leakage_safe_retrieval import load_query_bundle" in source
@@ -94,7 +94,7 @@ def test_notebook_05_uses_package_qualified_retrieval_import():
 
 def test_notebook_04_resumes_and_audits_independent_evaluation():
     notebook = json.loads(
-        (Path(__file__).parents[1] / "04_train_and_test_corrected_verifiers.ipynb").read_text(
+        (Path(__file__).parents[1] / "notebooks" / "04_train_and_test_corrected_verifiers.ipynb").read_text(
             encoding="utf-8"
         )
     )
@@ -109,7 +109,7 @@ def test_notebook_04_resumes_and_audits_independent_evaluation():
 
 def test_notebook_05_has_adjustable_model_and_bundle_loops():
     notebook = json.loads(
-        (Path(__file__).parents[1] / "05_run_multimodel_generation.ipynb").read_text(encoding="utf-8")
+        (Path(__file__).parents[1] / "notebooks" / "05_run_multimodel_generation.ipynb").read_text(encoding="utf-8")
     )
     source = "\n".join("".join(cell.get("source", [])) for cell in notebook["cells"])
     for model_key in (
@@ -557,7 +557,7 @@ def test_undefined_label_f1_is_not_replaced_with_one(tmp_path):
 
 def test_notebook_06_contains_complete_two_reader_gate():
     notebook = json.loads(
-        (Path(__file__).parents[1] / "06_chexbert_labeling_and_validation_gate.ipynb").read_text(
+        (Path(__file__).parents[1] / "notebooks" / "06_chexbert_labeling_and_validation_gate.ipynb").read_text(
             encoding="utf-8"
         )
     )
@@ -582,7 +582,7 @@ def test_notebook_06_contains_complete_two_reader_gate():
 
 def test_notebook_07_stops_cleanly_and_links_passed_gate_to_frozen_cohort():
     notebook = json.loads(
-        (Path(__file__).parents[1] / "07_compute_per_study_and_aggregate_metrics.ipynb").read_text(
+        (Path(__file__).parents[1] / "notebooks" / "07_compute_per_study_and_aggregate_metrics.ipynb").read_text(
             encoding="utf-8"
         )
     )
@@ -598,7 +598,7 @@ def test_notebook_07_stops_cleanly_and_links_passed_gate_to_frozen_cohort():
 
 def test_notebook_08_requires_verified_notebook07_outputs_and_correct_holm_families():
     notebook = json.loads(
-        (Path(__file__).parents[1] / "08_cluster_bootstrap_and_paired_tests.ipynb").read_text(
+        (Path(__file__).parents[1] / "notebooks" / "08_cluster_bootstrap_and_paired_tests.ipynb").read_text(
             encoding="utf-8"
         )
     )
@@ -781,7 +781,7 @@ def test_radgraph_compatibility_restores_removed_encode_plus(monkeypatch):
 
 
 def test_notebook_08_recomputes_vector_derived_metrics_within_replicates():
-    notebook = Path(__file__).parents[1] / "08_cluster_bootstrap_and_paired_tests.ipynb"
+    notebook = Path(__file__).parents[1] / "notebooks" / "08_cluster_bootstrap_and_paired_tests.ipynb"
     source = notebook.read_text(encoding="utf-8")
     assert "vector_derived_metrics" in source
     assert "direct_primary_metrics" in source
@@ -790,14 +790,14 @@ def test_notebook_08_recomputes_vector_derived_metrics_within_replicates():
 
 
 def test_notebook_07_records_the_prespecified_radgraph_reward_component():
-    notebook = Path(__file__).parents[1] / "07_compute_per_study_and_aggregate_metrics.ipynb"
+    notebook = Path(__file__).parents[1] / "notebooks" / "07_compute_per_study_and_aggregate_metrics.ipynb"
     source = notebook.read_text(encoding="utf-8")
     assert "radgraph_f1_reward_component" in source
     assert "partial_entity_relation_RG_ER" in source
 
 
 def test_notebook_09_requires_current_radgraph_and_statistics_outputs():
-    notebook = Path(__file__).parents[1] / "09_error_transitions_ensemble_runtime_exports.ipynb"
+    notebook = Path(__file__).parents[1] / "notebooks" / "09_error_transitions_ensemble_runtime_exports.ipynb"
     source = notebook.read_text(encoding="utf-8")
     assert "Notebook 08 statistics are stale relative to Notebook 07 metrics" in source
     assert "Notebook 07 RadGraph failed" in source
@@ -823,7 +823,7 @@ def test_corrected_training_uses_canonical_base_not_legacy_base():
 
 
 def test_medgemma_registry_uses_full_bf16_training_loader():
-    config = json.loads((Path(__file__).parents[1] / "rerun_config.json").read_text(encoding="utf-8"))
+    config = json.loads((Path(__file__).parents[1] / "rerun_config.example.json").read_text(encoding="utf-8"))
     spec = config["models"]["medgemma_4b"]
     assert spec["training_base_model"] == "unsloth/medgemma-4b-it"
     assert spec["fallback_base_model"] == "unsloth/medgemma-4b-it-bnb-4bit"
@@ -831,7 +831,7 @@ def test_medgemma_registry_uses_full_bf16_training_loader():
 
 
 def test_phi4_registry_and_scoped_siglip2_compatibility_alias():
-    config = json.loads((Path(__file__).parents[1] / "rerun_config.json").read_text(encoding="utf-8"))
+    config = json.loads((Path(__file__).parents[1] / "rerun_config.example.json").read_text(encoding="utf-8"))
     spec = config["models"]["phi4_multimodal"]
     assert spec["training_base_model"] == "microsoft/Phi-4-reasoning-vision-15B"
     assert spec["loader_profile"] == "phi4_reasoning_vision_reference_bf16"
@@ -847,6 +847,7 @@ def test_phi4_registry_and_scoped_siglip2_compatibility_alias():
 
 
 def test_phi4_verifier_is_text_only_but_other_multimodal_verifiers_keep_images(monkeypatch):
+    pytest.importorskip("transformers", reason="Optional model-runtime dependency required for this compatibility check")
     monkeypatch.setattr(
         "rerun_code.generation._install_phi4_legacy_numpy_patch_helpers", lambda: False
     )
@@ -860,6 +861,7 @@ def test_phi4_verifier_is_text_only_but_other_multimodal_verifiers_keep_images(m
 
 
 def test_phi4_dynamic_cache_is_adapted_only_on_concrete_phi_model_instance():
+    pytest.importorskip("torch", reason="Optional model-runtime dependency required for this compatibility check")
     class Phi4ForCausalLMV:
         def get_vision_tower(self):
             return object()
@@ -905,6 +907,7 @@ def test_phi4_dynamic_cache_is_adapted_only_on_concrete_phi_model_instance():
 
 
 def test_phi4_verifier_accepts_batchencoding_and_tensor_chat_template_results():
+    pytest.importorskip("torch", reason="Optional model-runtime dependency required for this compatibility check")
     import torch
 
     class FakeBatchEncoding(dict):
@@ -1053,7 +1056,7 @@ def test_phi4_generation_uses_reference_prompt_and_numpy_normalization_path(monk
 
 
 def test_reference_text_model_registry_matches_supplied_notebooks():
-    config = json.loads((Path(__file__).parents[1] / "rerun_config.json").read_text(encoding="utf-8"))
+    config = json.loads((Path(__file__).parents[1] / "rerun_config.example.json").read_text(encoding="utf-8"))
     expected = {
         "gpt_oss_20b": ("openai/gpt-oss-20b", "base", "auto", "gpt-oss_20b_12combo.ipynb"),
         "llama_3_1_8b": ("unsloth/llama-3-8b-Instruct", "adapter_then_base", "plain", "llama_eval_15combo.ipynb"),

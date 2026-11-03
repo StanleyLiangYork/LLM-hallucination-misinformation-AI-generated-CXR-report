@@ -94,3 +94,20 @@ The workflow invokes the official implementations or model assets for CheXbert, 
 ## License
 
 The code in this repository is released under the [MIT License](LICENSE). Third-party models, checkpoints, datasets, and external tools retain their own terms.
+
+
+## Additional reference review and matched-input notebooks
+
+- `14_copy_sampled_reference_images.ipynb` exports an existing 200-case reference-review image sample. Supply `JAMIA_REFERENCE_SAMPLE` as a private JSON array with `blinded_review_id`, `image_path`, and `image_sha256`. The sample itself is not distributed.
+- `15_freeze_matched_input_ablation.ipynb` freezes the query cohort, retrieved evidence, models, adapters, source fingerprints, and two direct-image input arms.
+- `16_generate_matched_input_ablation.ipynb` runs paired generation with per-record checkpoints and validated restart. It requires a working allocated GPU.
+- `17_score_matched_input_ablation.ipynb` scores complete reports in resumable chunks with CheXbert and RadGraph.
+- `18_analyze_matched_input_ablation.ipynb` computes paired cluster inference, corrected comparisons, and rescue/harm summaries.
+
+Set `JAMIA_RERUN_DIR` to this repository root (not `notebooks/`) and configure `rerun_config.json`. Helpers reside in `src/rerun_code/`. Set `JAMIA_OUTPUT_ROOT` to the existing results root from notebooks 00–13. Notebook 15 requires the earlier fixed retrieval bundles, leakage audit, corrected adapters, and evaluation provenance. The new experiment writes under `results/post_rerun/modality_ablation/<RUN_NAME>/`; it does not replace the original generation cohort. Optional `JAMIA_DATA_ROOT` and `JAMIA_OLD_DATA_ROOT` relocate the known data-root prefix while retaining content verification.
+
+Both modality arms retain image-conditioned retrieval. The comparison estimates direct image access within MedGemma and Phi-4, not the effect of all image information or a general architecture advantage. Single-pass comparisons are primary within this exploratory experiment; revision and gated comparisons are secondary.
+
+Notebook 16 includes a disclosed post hoc empty-output recovery rule: one retry of an empty report pass with unchanged evidence and prompt and `min_new_tokens=32`. It preserves successful first attempts and audits recovery by arm. Unequal recovery limits interpretation of Phi-4 effects. Existing Biowulf frozen plans include source fingerprints: do not overwrite them to force a resume after changing code or repository layout. Continue historical runs with their original matching code, or freeze a separate new run. The versioned legacy amendment only accepts recognized fingerprints.
+
+`build_modality_ablation_notebooks.py` regenerates notebooks 15–18. Offline tests are in `tests/test_modality_ablation.py`; they require no patient data or model downloads. Full GPU execution still requires the configured datasets, checkpoints, and compatible runtime.

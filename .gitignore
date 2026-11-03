@@ -30,3 +30,8 @@ __pycache__/
 
 # Operating system files
 .DS_Store
+
+# Private reference-review inputs and image exports
+private_reference_sample.json
+sampled_images/
+rerun_config.json

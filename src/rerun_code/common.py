@@ -18,11 +18,12 @@ def add_leakage_code_to_path(project_dir: Path) -> Path:
     packaged rerun helpers are therefore exposed through the project root and
     must be imported as ``rerun_code.<module>``.
     """
-    package_dir = project_dir / "rerun_code"
-    if (package_dir / "leakage_safe_data.py").exists():
-        if str(project_dir) not in sys.path:
-            sys.path.insert(0, str(project_dir))
-        return package_dir
+    for package_root in (project_dir / "src", project_dir):
+        package_dir = package_root / "rerun_code"
+        if (package_dir / "leakage_safe_data.py").exists():
+            if str(package_root) not in sys.path:
+                sys.path.insert(0, str(package_root))
+            return package_dir
 
     # Backward-compatible support for a separately copied legacy helper folder.
     # Only that legacy folder is placed on sys.path because it is not a package.
