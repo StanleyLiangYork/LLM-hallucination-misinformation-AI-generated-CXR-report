@@ -1,0 +1,160 @@
+{
+  "schema_version": "1.2",
+  "source_repository": "https://github.com/antani-lab/LLM-hallucination-misinformation-AI-generated-CXR-report",
+  "biowulf_code_root": "/path/to/re_run",
+  "output_root": "/path/to/re_run/results",
+  "seeds": [
+    20260831
+  ],
+  "phash_threshold": 4,
+  "retrieval_k": 10,
+  "max_revision_passes": 4,
+  "generation": {
+    "do_sample": false,
+    "temperature": 0.0,
+    "max_new_tokens": 512,
+    "verifier_max_new_tokens": 8
+  },
+  "datasets": {
+    "mimic": {
+      "train": "/path/to/train",
+      "test": "/path/to/test",
+      "preencoded_train": "/path/to/preencoded_train",
+      "preencoded_test": "/path/to/preencoded_test",
+      "patient_id_reliable": true
+    },
+    "iuhn": {
+      "train": "/path/to/train",
+      "test": "/path/to/test",
+      "preencoded_train": "/path/to/preencoded_train",
+      "preencoded_test": "/path/to/preencoded_test",
+      "patient_id_reliable": false
+    },
+    "combined": {
+      "preencoded_train": "/path/to/preencoded_train",
+      "preencoded_test": "/path/to/preencoded_test"
+    }
+  },
+  "models": {
+    "medgemma_4b": {
+      "display_name": "MedGemma-4B",
+      "architecture": "multimodal",
+      "fallback_base_model": "unsloth/medgemma-4b-it-bnb-4bit",
+      "training_base_model": "unsloth/medgemma-4b-it",
+      "loader_profile": "medgemma_unsloth_bf16_training",
+      "legacy_adapter": "/path/to/legacy_adapter"
+    },
+    "phi4_multimodal": {
+      "display_name": "Phi-4-Multimodal",
+      "architecture": "multimodal",
+      "fallback_base_model": "microsoft/Phi-4-reasoning-vision-15B",
+      "training_base_model": "microsoft/Phi-4-reasoning-vision-15B",
+      "loader_profile": "phi4_reasoning_vision_reference_bf16",
+      "legacy_adapter": "/path/to/legacy_adapter"
+    },
+    "gpt_oss_20b": {
+      "display_name": "GPT-OSS-20B",
+      "architecture": "text",
+      "fallback_base_model": "openai/gpt-oss-20b",
+      "training_base_model": "openai/gpt-oss-20b",
+      "loader_profile": "reference_causal_lm_bf16",
+      "tokenizer_source": "base",
+      "chat_template_policy": "auto",
+      "reference_loading_notebook": "gpt-oss_20b_12combo.ipynb",
+      "legacy_adapter": "/path/to/legacy_adapter"
+    },
+    "llama_3_1_8b": {
+      "display_name": "Llama-3-8B (reference checkpoint; not Llama 3.1)",
+      "architecture": "text",
+      "fallback_base_model": "unsloth/llama-3-8b-Instruct",
+      "training_base_model": "unsloth/llama-3-8b-Instruct",
+      "loader_profile": "reference_causal_lm_bf16",
+      "tokenizer_source": "adapter_then_base",
+      "chat_template_policy": "plain",
+      "reference_loading_notebook": "llama_eval_15combo.ipynb",
+      "legacy_adapter": "/path/to/legacy_adapter",
+      "require_adapter_base_contains": "llama-3-8b",
+      "manuscript_identity_note": "The compatibility key llama_3_1_8b is retained for existing job scripts, but the supplied reference notebook and LoRA use unsloth/llama-3-8b-Instruct. Report this comparator as Llama-3-8B, never Llama-3.1-8B."
+    },
+    "medqwen2_7b": {
+      "display_name": "Med-Qwen2-7B",
+      "architecture": "text",
+      "fallback_base_model": "Echelon-AI/Med-Qwen2-7B",
+      "training_base_model": "Echelon-AI/Med-Qwen2-7B",
+      "loader_profile": "reference_causal_lm_bf16",
+      "tokenizer_source": "base",
+      "chat_template_policy": "auto",
+      "reference_loading_notebook": "medqwen2_7b_eval_12combo.ipynb",
+      "legacy_adapter": "/path/to/legacy_adapter"
+    },
+    "openbiollm_8b": {
+      "display_name": "OpenBioLLM-8B",
+      "architecture": "text",
+      "fallback_base_model": "aaditya/OpenBioLLM-Llama3-8B",
+      "training_base_model": "aaditya/OpenBioLLM-Llama3-8B",
+      "loader_profile": "reference_causal_lm_bf16",
+      "tokenizer_source": "adapter_then_base",
+      "chat_template_policy": "plain",
+      "reference_loading_notebook": "biomed_llama_eval_15combo.ipynb",
+      "legacy_adapter": "/path/to/legacy_adapter"
+    },
+    "qwen2_1_5b": {
+      "display_name": "Qwen2-1.5B",
+      "architecture": "text",
+      "fallback_base_model": "Qwen/Qwen2-1.5B-Instruct",
+      "training_base_model": "Qwen/Qwen2-1.5B-Instruct",
+      "legacy_adapter": "/path/to/legacy_adapter"
+    }
+  },
+  "verifier_data": {
+    "source_jsonl": "/path/to/verifier_data.jsonl",
+    "split_fractions": [
+      0.8,
+      0.1,
+      0.1
+    ],
+    "seed": 20260831,
+    "minimum_test_examples": 100
+  },
+  "labeler": {
+    "backend": "chexbert",
+    "chexbert_repo": "/path/to/CheXbert",
+    "checkpoint": "/path/to/chexbert.pth",
+    "minimum_manual_validation_reports": 200,
+    "minimum_macro_f1": 0.8,
+    "required_annotators": 2,
+    "required_f1_evaluable_labels": 13,
+    "uncertain_policy": {
+      "atelectasis": 1,
+      "cardiomegaly": 0,
+      "consolidation": 0,
+      "edema": 1,
+      "enlarged cardiomediastinum": 0,
+      "fracture": 0,
+      "lung lesion": 0,
+      "lung opacity": 0,
+      "pleural effusion": 0,
+      "pleural other": 0,
+      "pneumonia": 0,
+      "pneumothorax": 0,
+      "support devices": 1
+    }
+  },
+  "statistics": {
+    "bootstrap_replicates": 10000,
+    "permutation_replicates": 10000,
+    "confidence_level": 0.95,
+    "seed": 20260831,
+    "primary_metrics": [
+      "fer_abnormal",
+      "omission",
+      "macro_f1",
+      "radgraph_f1"
+    ]
+  },
+  "ensemble_models": [
+    "medgemma_4b",
+    "qwen2_1_5b",
+    "medqwen2_7b"
+  ]
+}

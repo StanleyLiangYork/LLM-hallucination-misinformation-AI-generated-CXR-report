@@ -1,0 +1,69 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{geometry}
+\usepackage[T1]{fontenc}
+\geometry{top=0.45in, bottom=0.50in, left=0.65in, right=0.65in}
+\setlength{\textfloatsep}{4pt}
+
+\begin{document}
+
+\setcounter{algorithm}{2}
+
+\begin{algorithm}[H]
+\small
+\caption{Report Generation, CheXbert Labeling, and 13-Label Matching}
+\begin{algorithmic}[1]
+
+\Require Query set $\mathcal{Q}=\{(\mathbf{X}_i,G_i)\}_{i=1}^{N}$, where $\mathbf{X}_i$ is a chest radiograph and $G_i$ is the structured JSON \texttt{labels} list
+\Require Pre-trained multimodal LLM $\mathcal{M}$ in evaluation mode and multimodal processor $\mathcal{P}$
+\Require Pinned official CheXbert implementation and checkpoint $\mathcal{B}$ (versions reported in Methods), and 13-finding vocabulary $\mathcal{L}=\{\ell_1,\ldots,\ell_{13}\}$
+\Require Frozen uncertainty map $u_k\in\{0,1\}$, with $u_k=1$ for atelectasis, edema, and support devices, and $u_k=0$ for all other findings
+\Require System prompt $P_{\mathrm{sys}}$, beginning-of-image marker $\tau_{\mathrm{BOI}}$, maximum new tokens $T_{\max}$, and maximum input length $L_{\max}$
+
+\Ensure Generated report $r_i$, reference vector $\mathbf{g}_i$, predicted vector $\mathbf{y}_i$, and event-level match vector $\mathbf{m}_i$ for each query
+
+\State Construct a fixed chat prompt that asks the model to examine the query image, assess the 13 findings, and return \textsc{Findings} and \textsc{Impression}
+\State $c\gets\mathcal{P}.\texttt{apply\_chat\_template}(P_{\mathrm{sys}},\texttt{add\_generation\_prompt=True})$
+\State Prepend $\tau_{\mathrm{BOI}}$ when required by the model processor
+
+\For{each $(\mathbf{X}_i,G_i)\in\mathcal{Q}$}
+    \State Load $\mathbf{X}_i$ as RGB and process the text and image jointly:
+    \Statex \hspace{1.5em}$(I_i,A_i,\mathbf{V}_i)\gets\mathcal{P}(c,\mathbf{X}_i,\texttt{truncate}=L_{\max})$
+    \State Generate by greedy decoding:
+    \Statex \hspace{1.5em}$\hat{I}_i\gets\mathcal{M}.\texttt{generate}(I_i,A_i,\mathbf{V}_i,\texttt{max\_new\_tokens}=T_{\max},\texttt{do\_sample=False})$
+    \State Decode only newly generated tokens and normalize whitespace to obtain report $r_i$
+
+    \State Apply the pinned official CheXbert model once to the complete report:
+    \Statex \hspace{1.5em}$\mathbf{z}_i\gets\mathcal{B}(r_i)$, where $z_{i,k}\in\{1,0,-1,\varnothing\}$ denotes positive, negative, uncertain, or blank
+
+    \For{$k=1$ \textbf{to} $13$}
+        \State $g_{i,k}\gets\mathbb{1}[\ell_k\in G_i]$ \Comment{If $G_i$ is empty, all 13 reference labels are zero}
+        \State Map the CheXbert state using the frozen policy:
+        \[
+        y_{i,k}\gets
+        \begin{cases}
+            1, & z_{i,k}=1,\\
+            u_k, & z_{i,k}=-1,\\
+            0, & z_{i,k}\in\{0,\varnothing\}.
+        \end{cases}
+        \]
+        \State $m_{i,k}\gets\mathbb{1}[y_{i,k}=g_{i,k}]$
+        \Comment{``Matched'' means equality of the two binary states}
+    \EndFor
+    \State $\mathbf{g}_i\gets(g_{i,1},\ldots,g_{i,13})^{\top}$, $\mathbf{y}_i\gets(y_{i,1},\ldots,y_{i,13})^{\top}$, and $\mathbf{m}_i\gets(m_{i,1},\ldots,m_{i,13})^{\top}$
+    \State Predict normality as \textsc{Normal} if $\|\mathbf{y}_i\|_1=0$ and \textsc{Abnormal} otherwise
+\EndFor
+
+\State \Return $\{(r_i,\mathbf{g}_i,\mathbf{y}_i,\mathbf{m}_i)\}_{i=1}^{N}$
+\Statex
+\Statex \textbf{Operational definition.} Matching is not based on regular expressions, keywords, or whole-word occurrence, and no LLM judge is used. It is binary equality between the CheXbert-derived prediction and the structured JSON reference for a specific study and finding.
+\Statex
+\Statex \textbf{Limitations.} The procedure evaluates only 13 findings and inherits errors from the structured reference labels, CheXbert, and the frozen uncertainty mapping. It does not fully evaluate temporality, location, severity, device details, non-pathology content, or overall report quality. CheXbert achieved macro F1 $=0.860$ against adjudicated annotations for 200 blinded reports, but this validation does not establish global report factuality.
+
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}

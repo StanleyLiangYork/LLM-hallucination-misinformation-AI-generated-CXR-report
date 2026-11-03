@@ -1,0 +1,68 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{geometry}
+\geometry{top=0.55in, bottom=0.55in, left=0.75in, right=0.75in}
+
+\begin{document}
+
+\setcounter{algorithm}{0}
+
+\begin{algorithm}[H]
+\small
+\caption{Supervised Fine-tuning of a Text-only LoRA Verifier}
+\begin{algorithmic}[1]
+
+\Require Verification dataset $\mathcal{D} = \{(e_i,\, s_i,\, y_i)\}_{i=1}^{N}$, where $e_i$ is structured evidence, $s_i$ a candidate statement, $y_i \in \{\textsc{True},\textsc{False}\}$
+\Require Pre-trained text-only LLM $\mathcal{M}$ with tokenizer $\mathcal{T}$; system prompt $P_{\text{sys}}$
+\Require LoRA rank $r$, scaling factor $\alpha$, dropout $p_{\text{drop}}$, target projection modules $\mathcal{S}$
+\Require Epochs $E$, batch size $B$, gradient accumulation steps $G$, learning rate $\eta$, warmup ratio $w$, max sequence length $L_{\max}$, quantisation bits $q$
+
+\Ensure Trained LoRA adapter parameters $\Theta_{\text{LoRA}}$ and tokenizer $\mathcal{T}$
+
+\State Load $\mathcal{M}$ in $q$-bit NF4 quantisation (bfloat16 compute, double quantisation); freeze base weights
+\State Attach LoRA adapters to modules $\mathcal{S}$ with rank $r$, scaling $\alpha$, dropout $p_{\text{drop}}$ $\;\Rightarrow\;\mathcal{M}_{\text{LoRA}}$
+
+\For{each $(e_i, s_i, y_i) \in \mathcal{D}$}
+    \State Build chat turns $m_i \gets [\{\texttt{system}: P_{\text{sys}}\},\;\{\texttt{user}: e_i \oplus s_i\},\;\{\texttt{assistant}: y_i\}]$
+    \State Format: $x_i \gets \mathcal{T}.\texttt{apply\_chat\_template}(m_i)$; discard if $|\mathcal{T}(x_i)| > L_{\max}$
+\EndFor
+\State Split into $\mathcal{D}_{\text{train}}$ ($98\%$, $n=7{,}743$) and $\mathcal{D}_{\text{val}}$ ($2\%$, $n=159$) with fixed random seed
+
+\State Initialise paged AdamW-8bit optimiser with cosine LR schedule, rate $\eta$, warmup ratio $w$
+\For{$\text{epoch} = 1$ \textbf{to} $E$}
+    \For{each minibatch $\mathcal{B} = \{x_i\}_{i=1}^{B} \subset \mathcal{D}_{\text{train}}$}
+        \State Tokenise: $(I_i, A_i) \gets \mathcal{T}(x_i,\;\texttt{truncate}=L_{\max})$
+        \State Compute prompt length $\ell_i^{\text{prompt}}$ from the prompt-only prefix of $x_i$
+        \State Apply label masking:
+        \[
+            \Lambda_{i,t} =
+            \begin{cases}
+                -100    & t \leq \ell_i^{\text{prompt}} \\
+                I_{i,t} & \text{otherwise}
+            \end{cases}
+        \]
+        \State Forward pass: $\hat{L}_i \gets \mathcal{M}_{\text{LoRA}}(I_i, A_i;\,\Theta_{\text{LoRA}})$
+        \State Compute cross-entropy loss on unmasked (assistant) tokens only:
+        \[
+            \mathcal{L} = -\frac{1}{|\mathcal{B}|}
+            \sum_{i=1}^{|\mathcal{B}|}
+            \sum_{t:\,\Lambda_{i,t} \neq -100}
+            \log \frac{\exp\!\left(\hat{L}_{i,t,\Lambda_{i,t}}\right)}
+                      {\sum_{v} \exp\!\left(\hat{L}_{i,t,v}\right)}
+        \]
+        \State Accumulate gradients; update $\Theta_{\text{LoRA}}$ every $G$ steps
+        \State \texttt{LogMetrics}$(\mathcal{L},\;\text{epoch},\;\text{step})$
+    \EndFor
+    \State Evaluate $\mathcal{L}_{\text{val}}$ on $\mathcal{D}_{\text{val}}$ at every $K$-th step
+\EndFor
+
+\State Save $\Theta_{\text{LoRA}}$ and $\mathcal{T}$ to adapter directory \Comment{Base weights remain frozen}
+\State \Return $\Theta_{\text{LoRA}},\;\mathcal{T}$
+
+\end{algorithmic}
+\end{algorithm}
+
+\end{document}
